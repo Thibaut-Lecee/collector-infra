@@ -1,0 +1,51 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: collector-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - collector.local
+      secretName: collector-tls
+  rules:
+    - host: collector.local
+      http:
+        paths:
+          # Frontend NextAuth endpoints must stay on the frontend service.
+          - path: /api/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: collector-front
+                port:
+                  number: 3000
+          - path: /api/userinfo
+            pathType: Prefix
+            backend:
+              service:
+                name: collector-front
+                port:
+                  number: 3000
+
+          # Backend API under /api/*
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: collector-api
+                port:
+                  number: 3000
+
+          # Everything else goes to the frontend.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: collector-front
+                port:
+                  number: 3000

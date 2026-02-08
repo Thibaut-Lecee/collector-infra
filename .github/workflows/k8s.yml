@@ -1,0 +1,62 @@
+name: k8s
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      server_dry_run:
+        description: "Run kubectl apply --dry-run=server on a kind cluster"
+        required: false
+        default: "false"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+
+      - name: Install kubeconform
+        run: |
+          go install github.com/yannh/kubeconform/cmd/kubeconform@latest
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Render manifests
+        run: |
+          kubectl kustomize infra/k8s/base > /tmp/k8s-base.yaml
+          kubectl kustomize infra/k8s/overlays/minikube > /tmp/k8s-minikube.yaml
+
+      - name: Kubeconform (base)
+        run: kubeconform -strict -ignore-missing-schemas /tmp/k8s-base.yaml
+
+      - name: Kubeconform (minikube)
+        run: kubeconform -strict -ignore-missing-schemas /tmp/k8s-minikube.yaml
+
+  server-dry-run:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.server_dry_run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+
+      - name: Render manifests
+        run: kubectl kustomize infra/k8s/overlays/minikube > /tmp/k8s.yaml
+
+      - name: Server-side dry-run apply
+        run: kubectl apply --dry-run=server -f /tmp/k8s.yaml

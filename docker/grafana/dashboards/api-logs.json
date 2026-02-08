@@ -1,0 +1,51 @@
+{
+  "uid": "api-logs",
+  "title": "API Logs",
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "5s",
+  "editable": true,
+  "tags": ["collector", "logs"],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "logs",
+      "title": "API logs (service=api)",
+      "datasource": "Loki",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=\"api\"}",
+          "queryType": "range"
+        }
+      ],
+      "gridPos": {
+        "h": 24,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}

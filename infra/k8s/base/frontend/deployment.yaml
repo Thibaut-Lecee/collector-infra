@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector-front
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collector-front
+  template:
+    metadata:
+      labels:
+        app: collector-front
+    spec:
+      containers:
+        - name: frontend
+          image: collector-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-front-config
+                  key: NODE_ENV
+            - name: NEXT_PUBLIC_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-front-config
+                  key: NEXT_PUBLIC_API_URL
+            - name: INTERNAL_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-front-config
+                  key: INTERNAL_API_URL
+            - name: NEXTAUTH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-front-config
+                  key: NEXTAUTH_URL
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: collector-front-secret
+                  key: SESSION_SECRET
+            - name: SESSION_DURATION
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-front-config
+                  key: SESSION_DURATION
+            - name: ZITADEL_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-front-config
+                  key: ZITADEL_ISSUER
+            - name: ZITADEL_INTERNAL_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-front-config
+                  key: ZITADEL_INTERNAL_ISSUER
+            - name: ZITADEL_CLIENT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-front-config
+                  key: ZITADEL_CLIENT_ID
+            - name: ZITADEL_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: collector-front-secret
+                  key: ZITADEL_CLIENT_SECRET
+            - name: ZITADEL_POST_LOGOUT_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-front-config
+                  key: ZITADEL_POST_LOGOUT_URL
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

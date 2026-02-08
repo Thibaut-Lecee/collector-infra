@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-api-config
+data:
+  CORS_ORIGIN: "https://collector.local"
+  # Pods must reach ZITADEL over the host network; keep the public issuer as localhost for browsers.
+  ZITADEL_INTERNAL_ISSUER: "http://host.minikube.internal:8080"

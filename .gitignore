@@ -1,0 +1,22 @@
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+*.log
+.DS_Store
+
+
+# Secrets / tokens (local-only)
+*.pat
+**/*.pat
+**/*.pat.local
+
+# Generated secrets (do not commit)
+k8s/minikube/ingress/tls-secret.yaml
+k8s/minikube/**/secret.yaml
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-front-config
+data:
+  NODE_ENV: "production"
+  NEXTAUTH_URL: "http://localhost:3000"
+  SESSION_DURATION: "3600"
+
+  # Public API URL used by the browser (NEXT_PUBLIC_* are compiled into the client bundle at build time).
+  NEXT_PUBLIC_API_URL: "http://localhost:3001/api"
+  # Internal API URL used by Next.js server (rewrites/proxy).
+  INTERNAL_API_URL: "http://collector-api:3000"
+
+  # Public issuer used by the browser (redirects, URLs in the auth flow)
+  ZITADEL_ISSUER: "http://localhost:8080"
+  # Internal issuer used by the container/pod to reach ZITADEL (can differ from the public issuer)
+  ZITADEL_INTERNAL_ISSUER: "http://localhost:8080"
+  ZITADEL_CLIENT_ID: "replace-me"
+  ZITADEL_POST_LOGOUT_URL: "http://localhost:3000/api/auth/logout/callback"

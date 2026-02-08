@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE}
+    container_name: ${COMPOSE_PROJECT_NAME}-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost -p 5432",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+
+# Network configuration - allows services to communicate
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local

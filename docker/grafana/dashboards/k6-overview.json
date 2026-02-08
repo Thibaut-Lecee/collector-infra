@@ -1,0 +1,147 @@
+{
+  "uid": "k6-overview",
+  "title": "k6 Overview",
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "5s",
+  "editable": true,
+  "tags": ["collector", "k6", "loadtest", "prometheus"],
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "VUs",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "k6_vus"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Requests/s",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(k6_http_reqs_total[1m]))"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 0 }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Failed requests (%)",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(k6_http_req_failed_rate)"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 0 }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "HTTP req duration p99 (ms)",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(k6_http_req_duration_p99) * 1000"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "HTTP req duration p99 by endpoint (ms)",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg by (name) (k6_http_req_duration_p99) * 1000"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Checks success rate (%)",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(k6_checks_rate)"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 15 }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Iterations/s",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(k6_iterations_total[1m]))"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 15 }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Data received/s",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": { "unit": "Bps" },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(k6_data_received_total[1m]))"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 15 }
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}
+
