@@ -14,3 +14,6 @@ data:
   ZITADEL_INTERNAL_ISSUER: "http://localhost:8080"
   ZITADEL_CLIENT_ID: "replace-me"
   ADMIN_ROLE_NAME: "admin"
+  # Rate limit (requests per IP per window). Override in overlays for demo/load testing.
+  RATE_LIMIT_MAX: "100"
+  RATE_LIMIT_WINDOW: "1 minute"

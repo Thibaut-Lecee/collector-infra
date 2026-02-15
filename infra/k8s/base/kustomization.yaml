@@ -6,17 +6,17 @@ namespace: collector
 resources:
   - namespace.yaml
 
-  - postgres/secret.yaml
+  - postgres/secret.example.yaml
   - postgres/service.yaml
   - postgres/statefulset.yaml
 
   - api/configmap.yaml
-  - api/secret.yaml
+  - api/secret.example.yaml
   - api/service.yaml
   - api/deployment.yaml
   - api/migrate-job.yaml
 
   - frontend/configmap.yaml
-  - frontend/secret.yaml
+  - frontend/secret.example.yaml
   - frontend/service.yaml
   - frontend/deployment.yaml

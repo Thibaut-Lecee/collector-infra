@@ -77,6 +77,22 @@ spec:
                 configMapKeyRef:
                   name: collector-api-config
                   key: ADMIN_ROLE_NAME
+            - name: RATE_LIMIT_MAX
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-api-config
+                  key: RATE_LIMIT_MAX
+            - name: RATE_LIMIT_WINDOW
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-api-config
+                  key: RATE_LIMIT_WINDOW
+            - name: GRAFANA_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-api-config
+                  key: GRAFANA_URL
+                  optional: true
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

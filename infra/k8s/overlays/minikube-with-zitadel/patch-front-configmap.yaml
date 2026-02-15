@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-front-config
+data:
+  NEXTAUTH_URL: "https://collector.local"
+  NEXT_PUBLIC_API_URL: "https://collector.local/api"
+  ZITADEL_POST_LOGOUT_URL: "https://collector.local/api/auth/logout/callback"
+  ZITADEL_ISSUER: "https://zitadel.collector.local"
+  ZITADEL_INTERNAL_ISSUER: "http://zitadel:8080"

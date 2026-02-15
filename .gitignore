@@ -14,9 +14,17 @@
 **/*.pat.local
 
 # Generated secrets (do not commit)
-k8s/minikube/ingress/tls-secret.yaml
-k8s/minikube/**/secret.yaml
+infra/k8s/.generated/
 
+# Kubernetes secrets overrides (copy `*.example.yaml` -> `*.yaml`, do not commit)
+infra/k8s/**/secret.yaml
+infra/k8s/**/secret.local.yaml
+
+# Legacy local-only files (K8s tree was replaced by infra/k8s/)
+k8s/minikube/
+
+# Local overrides (do not commit real secrets)
+infra/k8s/overlays/minikube-with-zitadel/zitadel/secret.yaml
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md

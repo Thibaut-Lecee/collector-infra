@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zitadel-config
+data:
+  # External domain used by browsers (issuer, redirects).
+  ZITADEL_EXTERNALDOMAIN: zitadel.collector.local
+  ZITADEL_EXTERNALSECURE: "true"
+  ZITADEL_EXTERNALPORT: "443"
+  # TLS is terminated by Ingress.
+  ZITADEL_TLS_ENABLED: "false"
+
+  # Database connection settings.
+  ZITADEL_DATABASE_POSTGRES_HOST: zitadel-postgres
+  ZITADEL_DATABASE_POSTGRES_PORT: "5432"
+  ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+  ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: postgres
+  ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+  ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+  ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+
+  # First instance (admin user) settings.
+  ZITADEL_FIRSTINSTANCE_ORG_NAME: collector
+  ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: zitadel-admin
+  ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+
+  # Keep login v1 for this POC.
+  ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zitadel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zitadel
+  template:
+    metadata:
+      labels:
+        app: zitadel
+    spec:
+      # ZITADEL reads env vars like `ZITADEL_PORT`. Kubernetes injects `*_PORT`
+      # service env vars which collide with ZITADEL's config parsing.
+      enableServiceLinks: false
+      initContainers:
+        - name: wait-for-db
+          image: postgres:17
+          command:
+            [
+              "sh",
+              "-c",
+              "until pg_isready -h zitadel-postgres -p 5432; do echo waiting for database; sleep 2; done;",
+            ]
+      containers:
+        - name: zitadel
+          image: ghcr.io/zitadel/zitadel:latest
+          command: ["/app/zitadel"]
+          args: ["start-from-init", "--masterkey", "$(ZITADEL_MASTERKEY)"]
+          env:
+            # Keep Postgres admin password single-sourced to avoid mismatches.
+            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: zitadel-postgres-secret
+                  key: POSTGRES_PASSWORD
+          envFrom:
+            - configMapRef:
+                name: zitadel-config
+            - secretRef:
+                name: zitadel-secret
+          ports:
+            - containerPort: 8080
+              name: http
+          livenessProbe:
+            exec:
+              command:
+                - /app/zitadel
+                - ready
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - /app/zitadel
+                - ready
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zitadel
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+  selector:
+    app: zitadel

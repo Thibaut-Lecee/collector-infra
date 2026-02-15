@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus.yml=prometheus/prometheus.yml
+
+  - name: grafana-config
+    files:
+      - grafana.ini=grafana/grafana.ini
+
+  - name: grafana-provisioning-datasources
+    files:
+      - prometheus.yaml=grafana/provisioning/datasources/prometheus.yaml
+      - loki.yaml=grafana/provisioning/datasources/loki.yaml
+
+  - name: grafana-provisioning-dashboards
+    files:
+      - dashboard.yaml=grafana/provisioning/dashboards/dashboard.yaml
+
+  - name: grafana-dashboards
+    files:
+      - api-logs.json=grafana/dashboards/api-logs.json
+      - api-metrics.json=grafana/dashboards/api-metrics.json
+      - k6-overview.json=grafana/dashboards/k6-overview.json
+
+  - name: loki-config
+    files:
+      - loki-config.yaml=loki/loki-config.yaml
+
+  - name: promtail-config
+    files:
+      - promtail-config.yaml=promtail/promtail-config.yaml
+
+resources:
+  - prometheus/deployment.yaml
+  - prometheus/service.yaml
+  - grafana/deployment.yaml
+  - grafana/service.yaml
+  - loki/deployment.yaml
+  - loki/service.yaml
+  - promtail/rbac.yaml
+  - promtail/daemonset.yaml

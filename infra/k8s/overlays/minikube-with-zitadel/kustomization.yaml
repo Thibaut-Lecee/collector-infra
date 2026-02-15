@@ -8,6 +8,12 @@ resources:
   - ../../observability
   - ingress.yaml
 
+  # ZITADEL inside Minikube (separate DB)
+  - zitadel/postgres.yaml
+  - zitadel/secret.example.yaml
+  - zitadel/deployment.yaml
+  - zitadel/ingress.yaml
+
 patches:
   - path: patch-api-configmap.yaml
   - path: patch-api-migrate-job.yaml

@@ -6,15 +6,16 @@ services:
     image: postgres:17
     restart: unless-stopped
     environment:
-      PGUSER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: collector
+      PGUSER: ${POSTGRES_USER:-collector}
+      POSTGRES_USER: ${POSTGRES_USER:-collector}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-collector}
     volumes:
       - db-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-collector} -d ${POSTGRES_DB:-collector}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,11 +24,15 @@ services:
     image: postgres:17-alpine
     container_name: zitadel-db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: zitadel
+      POSTGRES_USER: ${ZITADEL_DB_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${ZITADEL_DB_ADMIN_PASSWORD:-change-me}
+      POSTGRES_DB: ${ZITADEL_DB_NAME:-zitadel}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d zitadel"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${ZITADEL_DB_ADMIN_USER:-postgres} -d ${ZITADEL_DB_NAME:-zitadel}",
+        ]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -46,28 +51,25 @@ services:
       # Database connection (required)
       ZITADEL_DATABASE_POSTGRES_HOST: db-zitadel
       ZITADEL_DATABASE_POSTGRES_PORT: "5432"
-      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_DATABASE: ${ZITADEL_DB_NAME:-zitadel}
       ZITADEL_DATABASE_POSTGRES_SSL_MODE: disable
-      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: postgres
-      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: postgres
-      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
-      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: ${ZITADEL_DB_ADMIN_USER:-postgres}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${ZITADEL_DB_ADMIN_PASSWORD:-change-me}
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: ${ZITADEL_DB_APP_USER:-zitadel}
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${ZITADEL_DB_APP_PASSWORD:-change-me}
 
       # External domain (required for localhost access)
-      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALDOMAIN: ${ZITADEL_EXTERNALDOMAIN:-localhost}
       ZITADEL_EXTERNALPORT: 8080
       ZITADEL_EXTERNALSECURE: "false"
 
       # First instance admin user (required) (username:zitadel-admin@zitadel.localhost)
-      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: zitadel-admin
-      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: Password1!
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: ${ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME:-zitadel-admin}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD}
 
       # Disable Login V2 (required - V2 doesn't work properly yet)
       ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
-    command: >
-      start-from-init
-      --masterkey pBRR59cb3chEqftV467Ph3abokMn3pUK
-      --tlsMode disabled
+    command: ["start-from-init", "--masterkey", "${ZITADEL_MASTERKEY}", "--tlsMode", "disabled"]
     ports:
       - "8080:8080" # http://localhost:8080
     healthcheck:
@@ -87,14 +89,14 @@ services:
     env_file:
       - ../collector-api/.env
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/collector
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-collector}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-collector}
       - HOST=0.0.0.0
       - PORT=3001
       - GRAFANA_URL=http://grafana:3000
       - ADMIN_ROLE_NAME=admin
       # Zitadel config (Network override)
-      - ZITADEL_ISSUER=http://localhost:8080
-      - ZITADEL_INTERNAL_ISSUER=http://zitadel:8080
+      - ZITADEL_ISSUER=${ZITADEL_ISSUER:-http://localhost:8080}
+      - ZITADEL_INTERNAL_ISSUER=${ZITADEL_INTERNAL_ISSUER:-http://zitadel:8080}
     volumes:
       - ../collector-api:/app
       - /app/node_modules
@@ -120,11 +122,11 @@ services:
       - INTERNAL_API_URL=http://api:3001
       - NEXTAUTH_URL=http://localhost:3000
       # Public issuer used by the browser (redirects, URLs in the auth flow)
-      - ZITADEL_ISSUER=http://localhost:8080
+      - ZITADEL_ISSUER=${ZITADEL_ISSUER:-http://localhost:8080}
       # Back-channel issuer used by the container to reach ZITADEL over the Docker network.
       # ZITADEL selects the instance by Host header (configured as localhost), so the app
       # must send Host=localhost:8080 while calling http://zitadel:8080 internally.
-      - ZITADEL_INTERNAL_ISSUER=http://zitadel:8080
+      - ZITADEL_INTERNAL_ISSUER=${ZITADEL_INTERNAL_ISSUER:-http://zitadel:8080}
     volumes:
       - ../collector-front:/app
       - /app/node_modules
@@ -193,8 +195,8 @@ services:
       - ./docker/grafana/dashboards:/etc/grafana/dashboards
       - grafana-data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_SERVER_ROOT_URL=http://localhost:3002/
       - GF_SERVER_SERVE_FROM_SUB_PATH=false
     depends_on:
@@ -203,7 +205,6 @@ services:
 volumes:
   db-data:
   dbdata:
-  zitadel-init-data:
   loki-data:
   prometheus-data:
   grafana-data:

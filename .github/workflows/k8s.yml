@@ -2,7 +2,7 @@ name: k8s
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -35,12 +35,16 @@ jobs:
         run: |
           kubectl kustomize infra/k8s/base > /tmp/k8s-base.yaml
           kubectl kustomize infra/k8s/overlays/minikube > /tmp/k8s-minikube.yaml
+          kubectl kustomize infra/k8s/overlays/minikube-with-zitadel > /tmp/k8s-minikube-with-zitadel.yaml
 
       - name: Kubeconform (base)
         run: kubeconform -strict -ignore-missing-schemas /tmp/k8s-base.yaml
 
       - name: Kubeconform (minikube)
         run: kubeconform -strict -ignore-missing-schemas /tmp/k8s-minikube.yaml
+
+      - name: Kubeconform (minikube-with-zitadel)
+        run: kubeconform -strict -ignore-missing-schemas /tmp/k8s-minikube-with-zitadel.yaml
 
   server-dry-run:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.server_dry_run == 'true'

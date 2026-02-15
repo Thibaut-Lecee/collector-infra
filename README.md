@@ -5,14 +5,14 @@ Infra repository for local development (`docker-compose`) and Kubernetes local d
 ## Structure
 
 - `docker-compose.local.yml`: complete local stack (db, zitadel, api, frontend, loki, promtail, grafana, prometheus)
-- `k8s/minikube/`: Kubernetes manifests (single source of truth for Minikube)
-- `k8s/minikube/scripts/`: cert + deploy scripts
+- `infra/k8s/`: Kubernetes manifests (Kustomize) for local Minikube deployment
 - `Makefile`: shortcuts for local and minikube workflows
 
 ## Local development (Docker)
 
 ```bash
 cd infraBloc3
+cp .env.example .env
 make dev-up
 make dev-status
 ```
@@ -48,24 +48,31 @@ Dashboards (Grafana):
 
 ```bash
 cd infraBloc3
-cp k8s/minikube/postgres/secret.example.yaml k8s/minikube/postgres/secret.yaml
-cp k8s/minikube/api/secret.example.yaml k8s/minikube/api/secret.yaml
-cp k8s/minikube/frontend/secret.example.yaml k8s/minikube/frontend/secret.yaml
-cp k8s/minikube/zitadel/secret.example.yaml k8s/minikube/zitadel/secret.yaml
-
-make minikube-deploy
+make minikube-deploy-app
+# or (includes ZITADEL inside Minikube):
+make minikube-deploy-app-zitadel
 ```
 
-Then add hosts:
+Load testing (k6, runs inside the cluster and remote-writes to Prometheus):
 
 ```bash
-echo "$(minikube ip) collector.local zitadel.collector.local" | sudo tee -a /etc/hosts
+make minikube-k6-smoke
+make minikube-k6-load
+make minikube-k6-stress
+```
+
+Then add hosts (see the docs for tunnel vs minikube ip):
+
+```bash
+echo "127.0.0.1 collector.local zitadel.collector.local" | sudo tee -a /etc/hosts
 ```
 
 Endpoints:
 
 - Frontend: `https://collector.local`
 - API health: `https://collector.local/health`
+- Grafana (proxied): `https://collector.local/internal/grafana/`
+- API metrics: `https://collector.local/metrics`
 - Zitadel: `https://zitadel.collector.local`
 
-See `k8s/minikube/README.md` for details.
+See `infra/k8s/README_MINIKUBE.md` for details.

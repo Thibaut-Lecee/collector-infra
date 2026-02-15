@@ -2,10 +2,10 @@ services:
   zitadel:
     restart: unless-stopped
     image: ghcr.io/zitadel/zitadel:latest
-    command: start-from-init --masterkey "MasterkeyNeedsToHave32Characters"
+    command: start-from-init --masterkey "${ZITADEL_MASTERKEY:-MasterkeyNeedsToHave32Characters}"
     environment:
       # See "What's next" to learn about how to serve Zitadel on a different domain or IP.
-      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALDOMAIN: ${ZITADEL_EXTERNALDOMAIN:-localhost}
 
       # See "What's next" to learn about how to enable TLS.
       ZITADEL_EXTERNALSECURE: false
@@ -13,16 +13,16 @@ services:
 
       # Database connection settings.
       ZITADEL_DATABASE_POSTGRES_HOST: db
-      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_PORT: ${ZITADEL_DB_PORT:-5432}
       # The database is created by the init job if it does not exist.
-      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_DATABASE: ${ZITADEL_DB_NAME:-zitadel}
       # The admin user must already exist in the database.
-      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: postgres
-      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: postgres
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: ${ZITADEL_DB_ADMIN_USER:-postgres}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${ZITADEL_DB_ADMIN_PASSWORD:-postgres}
       ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
       # The zitadel user is created by the init job if it does not exist.
-      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
-      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: ${ZITADEL_DB_APP_USER:-zitadel}
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${ZITADEL_DB_APP_PASSWORD:-zitadel}
       ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
 
       # By configuring a login client, the setup job creates a user of type machine with the role IAM_LOGIN_CLIENT.
@@ -91,7 +91,7 @@ services:
     image: ghcr.io/zitadel/zitadel-login:latest
     # If you can't use the network_mode service:zitadel, you can pass the environment variables ZITADEL_API_URL=http://zitadel:8080 and CUSTOM_REQUEST_HEADERS=Host:localhost instead.
     environment:
-      - ZITADEL_API_URL=http://localhost:8080
+      - ZITADEL_API_URL=${ZITADEL_API_URL:-http://localhost:8080}
       - NEXT_PUBLIC_BASE_PATH=/ui/v2/login
       - ZITADEL_SERVICE_USER_TOKEN_FILE=/current-dir/login-client.pat
     network_mode: service:zitadel
@@ -108,15 +108,11 @@ services:
     image: postgres:17
     environment:
       PGUSER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${ZITADEL_DB_ADMIN_PASSWORD:-postgres}
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready
-        - -d
-        - zitadel
-        - -U
-        - postgres
+        - pg_isready -d "${ZITADEL_DB_NAME:-zitadel}" -U "${ZITADEL_DB_ADMIN_USER:-postgres}"
       interval: 10s
       timeout: 30s
       retries: 5
