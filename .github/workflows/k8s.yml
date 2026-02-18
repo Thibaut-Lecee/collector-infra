@@ -133,6 +133,81 @@ jobs:
 
           echo "Security gate passed: no CRITICAL findings detected."
 
+  runtime-smoke:
+    name: Runtime smoke test (kind)
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: collector-smoke
+          wait: 120s
+
+      - name: Deploy manifests (GHCR latest)
+        run: kubectl apply -k infra/k8s/overlays/ci-smoke-ghcr
+
+      - name: Wait for Postgres
+        run: kubectl -n collector rollout status statefulset/postgres --timeout=180s
+
+      - name: Wait for migrations
+        run: |
+          kubectl -n collector wait --for=condition=complete job/collector-api-migrate --timeout=300s \
+            || (kubectl -n collector logs -l app=collector-api-migrate --tail=200 || true; exit 1)
+
+      - name: Wait for API & Frontend
+        run: |
+          kubectl -n collector rollout status deployment/collector-api --timeout=180s
+          kubectl -n collector rollout status deployment/collector-front --timeout=180s
+
+      - name: Smoke test endpoints
+        run: |
+          set -euo pipefail
+
+          kubectl -n collector port-forward svc/collector-api 3000:3000 >/tmp/pf-api.log 2>&1 &
+          pf_api=$!
+          kubectl -n collector port-forward svc/collector-front 3001:3000 >/tmp/pf-front.log 2>&1 &
+          pf_front=$!
+
+          cleanup() {
+            kill "$pf_api" "$pf_front" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3000/ready >/dev/null; then
+              echo "API is ready"
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS http://localhost:3000/ready >/dev/null
+
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3001/health >/dev/null; then
+              echo "Frontend is healthy"
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS http://localhost:3001/health >/dev/null
+
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          kubectl -n collector get pods -o wide || true
+          kubectl -n collector logs deployment/collector-api -c api --tail=200 || true
+          kubectl -n collector logs deployment/collector-front -c frontend --tail=200 || true
+          kubectl -n collector logs -l app=collector-api-migrate --tail=200 || true
+          kubectl -n collector describe pods || true
+
   server-dry-run:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.server_dry_run == 'true'
     runs-on: ubuntu-latest

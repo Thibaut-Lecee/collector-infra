@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: collector
+
+resources:
+  - ../minikube-with-zitadel-ghcr
+
+# Strict mode: pin image tags to immutable SHAs.
+# Replace the placeholders below with the desired image tags.
+images:
+  - name: ghcr.io/thibaut-lecee/collector-front-front
+    newTag: __FRONT_SHA__
+  - name: ghcr.io/thibaut-lecee/collector-api-api
+    newTag: __API_SHA__
+  - name: ghcr.io/thibaut-lecee/collector-api-api-migrate
+    newTag: __API_SHA__

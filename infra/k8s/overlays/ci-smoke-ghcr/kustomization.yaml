@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: collector
+
+resources:
+  - ../../base
+
+patches:
+  # CI smoke-test overlay: make postgres storage ephemeral (kind has no default storage class)
+  - path: patch-postgres-emptydir.yaml
+  # CI smoke-test overlay: use consistent demo credentials so migrations/app can start
+  - path: patch-postgres-secret.yaml
+  - path: patch-api-secret.yaml
+
+# GHCR images (demo mode): use :latest tags by default.
+images:
+  - name: collector-frontend
+    newName: ghcr.io/thibaut-lecee/collector-front-front
+    newTag: latest
+  - name: collector-api
+    newName: ghcr.io/thibaut-lecee/collector-api-api
+    newTag: latest
+  - name: collector-api-migrate
+    newName: ghcr.io/thibaut-lecee/collector-api-api-migrate
+    newTag: latest
