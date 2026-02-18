@@ -46,6 +46,93 @@ jobs:
       - name: Kubeconform (minikube-with-zitadel)
         run: kubeconform -strict -ignore-missing-schemas /tmp/k8s-minikube-with-zitadel.yaml
 
+      - name: Trivy config scan (base) [HIGH - warning]
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: /tmp/k8s-base.yaml
+          format: table
+          severity: HIGH
+          exit-code: "0"
+
+      - name: Trivy config scan (minikube) [HIGH - warning]
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: /tmp/k8s-minikube.yaml
+          format: table
+          severity: HIGH
+          exit-code: "0"
+
+      - name: Trivy config scan (minikube-with-zitadel) [HIGH - warning]
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: /tmp/k8s-minikube-with-zitadel.yaml
+          format: table
+          severity: HIGH
+          exit-code: "0"
+
+      - name: Trivy config scan (base) [CRITICAL - block]
+        id: trivy_critical_base
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: /tmp/k8s-base.yaml
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+
+      - name: Trivy config scan (minikube) [CRITICAL - block]
+        id: trivy_critical_minikube
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: /tmp/k8s-minikube.yaml
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+
+      - name: Trivy config scan (minikube-with-zitadel) [CRITICAL - block]
+        id: trivy_critical_minikube_with_zitadel
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: /tmp/k8s-minikube-with-zitadel.yaml
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+
+      - name: Security gate (Trivy CRITICAL)
+        if: always()
+        run: |
+          failed=0
+
+          if [[ "${{ steps.trivy_critical_base.outcome }}" == "failure" ]]; then
+            echo "::error::CRITICAL findings detected in /tmp/k8s-base.yaml"
+            failed=1
+          fi
+
+          if [[ "${{ steps.trivy_critical_minikube.outcome }}" == "failure" ]]; then
+            echo "::error::CRITICAL findings detected in /tmp/k8s-minikube.yaml"
+            failed=1
+          fi
+
+          if [[ "${{ steps.trivy_critical_minikube_with_zitadel.outcome }}" == "failure" ]]; then
+            echo "::error::CRITICAL findings detected in /tmp/k8s-minikube-with-zitadel.yaml"
+            failed=1
+          fi
+
+          if [[ "$failed" == "1" ]]; then
+            echo "Security gate failed: CRITICAL findings detected."
+            exit 1
+          fi
+
+          echo "Security gate passed: no CRITICAL findings detected."
+
   server-dry-run:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.server_dry_run == 'true'
     runs-on: ubuntu-latest

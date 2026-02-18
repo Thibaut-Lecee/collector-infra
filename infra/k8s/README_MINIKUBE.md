@@ -259,7 +259,14 @@ If login redirects to ZITADEL and shows:
 
 It means the `client_id` sent by the frontend does not match any ZITADEL application (often because `ZITADEL_CLIENT_ID` is still `replace-me`).
 Create an OIDC Web app in the ZITADEL console and copy its `Client ID` + `Client Secret` into the frontend `ConfigMap`/`Secret`, then restart the frontend pod.
+```bash 
+cd infrabloc3 
+kubectl apply -k infra/k8s/overlays/minikube-with-zitadel  
+kubectl -n collector rollout restart deployment/collector-front 
+kubectl -n collector rollout status deployment/collector-front --timeout=120s 
+If Needed do the same with collector-api
 
+```
 ## Cleanup
 
 ```bash

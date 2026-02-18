@@ -16,5 +16,5 @@ data:
   ZITADEL_ISSUER: "http://localhost:8080"
   # Internal issuer used by the container/pod to reach ZITADEL (can differ from the public issuer)
   ZITADEL_INTERNAL_ISSUER: "http://localhost:8080"
-  ZITADEL_CLIENT_ID: "replace-me"
+  ZITADEL_CLIENT_ID: "360428929456013600"
   ZITADEL_POST_LOGOUT_URL: "http://localhost:3000/api/auth/logout/callback"

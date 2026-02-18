@@ -120,9 +120,9 @@ minikube-apply-app: minikube-context
 		sleep 5; \
 	done
 	@# Optional local overrides (gitignored): infra/k8s/base/**/secret.yaml
-	@if [ -f $(K8S_DIR)/base/postgres/secret.yaml ]; then kubectl apply -f $(K8S_DIR)/base/postgres/secret.yaml; fi
-	@if [ -f $(K8S_DIR)/base/api/secret.yaml ]; then kubectl apply -f $(K8S_DIR)/base/api/secret.yaml; fi
-	@if [ -f $(K8S_DIR)/base/frontend/secret.yaml ]; then kubectl apply -f $(K8S_DIR)/base/frontend/secret.yaml; fi
+	@if [ -f $(K8S_DIR)/base/postgres/secret.yaml ]; then kubectl -n collector apply -f $(K8S_DIR)/base/postgres/secret.yaml; fi
+	@if [ -f $(K8S_DIR)/base/api/secret.yaml ]; then kubectl -n collector apply -f $(K8S_DIR)/base/api/secret.yaml; fi
+	@if [ -f $(K8S_DIR)/base/frontend/secret.yaml ]; then kubectl -n collector apply -f $(K8S_DIR)/base/frontend/secret.yaml; fi
 	kubectl wait --for=condition=complete job/collector-api-migrate -n collector --timeout=300s || (kubectl -n collector logs -l app=collector-api-migrate --tail=200 || true; exit 1)
 	kubectl rollout restart deployment/collector-api -n collector || true
 	kubectl rollout restart deployment/collector-front -n collector || true
@@ -143,11 +143,11 @@ minikube-apply-app-zitadel: minikube-context
 		sleep 5; \
 	done
 	@# Optional local overrides (gitignored): infra/k8s/base/**/secret.yaml
-	@if [ -f $(K8S_DIR)/base/postgres/secret.yaml ]; then kubectl apply -f $(K8S_DIR)/base/postgres/secret.yaml; fi
-	@if [ -f $(K8S_DIR)/base/api/secret.yaml ]; then kubectl apply -f $(K8S_DIR)/base/api/secret.yaml; fi
-	@if [ -f $(K8S_DIR)/base/frontend/secret.yaml ]; then kubectl apply -f $(K8S_DIR)/base/frontend/secret.yaml; fi
+	@if [ -f $(K8S_DIR)/base/postgres/secret.yaml ]; then kubectl -n collector apply -f $(K8S_DIR)/base/postgres/secret.yaml; fi
+	@if [ -f $(K8S_DIR)/base/api/secret.yaml ]; then kubectl -n collector apply -f $(K8S_DIR)/base/api/secret.yaml; fi
+	@if [ -f $(K8S_DIR)/base/frontend/secret.yaml ]; then kubectl -n collector apply -f $(K8S_DIR)/base/frontend/secret.yaml; fi
 	@# Optional local override (gitignored): infra/k8s/overlays/minikube-with-zitadel/zitadel/secret.yaml
-	@if [ -f $(MINIKUBE_APP_ZITADEL_DIR)/zitadel/secret.yaml ]; then kubectl apply -f $(MINIKUBE_APP_ZITADEL_DIR)/zitadel/secret.yaml; fi
+	@if [ -f $(MINIKUBE_APP_ZITADEL_DIR)/zitadel/secret.yaml ]; then kubectl -n collector apply -f $(MINIKUBE_APP_ZITADEL_DIR)/zitadel/secret.yaml; fi
 	kubectl wait --for=condition=complete job/collector-api-migrate -n collector --timeout=300s || (kubectl -n collector logs -l app=collector-api-migrate --tail=200 || true; exit 1)
 	kubectl rollout restart deployment/collector-api -n collector || true
 	kubectl rollout restart deployment/collector-front -n collector || true
