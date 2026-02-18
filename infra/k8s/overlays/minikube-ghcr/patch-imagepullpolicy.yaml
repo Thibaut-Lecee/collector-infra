@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
         - name: api
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
 ---
 apiVersion: batch/v1
 kind: Job
@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: migrate
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -29,4 +29,4 @@ spec:
     spec:
       containers:
         - name: frontend
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always

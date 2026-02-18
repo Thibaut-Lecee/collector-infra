@@ -138,6 +138,9 @@ jobs:
     needs: validate
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -151,6 +154,30 @@ jobs:
           cluster_name: collector-smoke
           wait: 120s
 
+      - name: Configure GHCR pull secret (for kind)
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_PASSWORD: ${{ secrets.GHCR_PULL_TOKEN != '' && secrets.GHCR_PULL_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+
+          kubectl create namespace collector --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl -n collector create secret docker-registry ghcr-creds \
+            --docker-server=ghcr.io \
+            --docker-username="$GHCR_USERNAME" \
+            --docker-password="$GHCR_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          for i in {1..20}; do
+            if kubectl -n collector get serviceaccount default >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+          kubectl -n collector patch serviceaccount default -p '{"imagePullSecrets":[{"name":"ghcr-creds"}]}'
+
       - name: Deploy manifests (GHCR latest)
         run: kubectl apply -k infra/k8s/overlays/ci-smoke-ghcr
 
@@ -159,8 +186,38 @@ jobs:
 
       - name: Wait for migrations
         run: |
-          kubectl -n collector wait --for=condition=complete job/collector-api-migrate --timeout=300s \
-            || (kubectl -n collector logs -l app=collector-api-migrate --tail=200 || true; exit 1)
+          set -euo pipefail
+
+          timeout_seconds=300
+          end=$((SECONDS + timeout_seconds))
+
+          while (( SECONDS < end )); do
+            if kubectl -n collector get job collector-api-migrate -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null | grep -q "True"; then
+              echo "Migrations job completed"
+              exit 0
+            fi
+
+            if kubectl -n collector get job collector-api-migrate -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null | grep -q "True"; then
+              echo "::error::Migrations job failed"
+              kubectl -n collector logs -l app=collector-api-migrate --all-containers --tail=200 || true
+              kubectl -n collector describe job collector-api-migrate || true
+              kubectl -n collector describe pods -l app=collector-api-migrate || true
+              exit 1
+            fi
+
+            if kubectl -n collector get pods -l app=collector-api-migrate -o jsonpath='{range .items[*].status.containerStatuses[*]}{.state.waiting.reason}{"\n"}{end}' 2>/dev/null | grep -qE '^(ErrImagePull|ImagePullBackOff)$'; then
+              echo "::error::Migrations pod is stuck pulling the image (ErrImagePull/ImagePullBackOff)."
+              kubectl -n collector describe pods -l app=collector-api-migrate || true
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          echo "::error::Timed out waiting for migrations job to complete."
+          kubectl -n collector describe job collector-api-migrate || true
+          kubectl -n collector describe pods -l app=collector-api-migrate || true
+          exit 1
 
       - name: Wait for API & Frontend
         run: |

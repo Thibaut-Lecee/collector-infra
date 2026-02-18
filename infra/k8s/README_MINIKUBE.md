@@ -84,6 +84,8 @@ minikube image load -p "$MINIKUBE_PROFILE" collector-api-migrate:latest
 minikube image load -p "$MINIKUBE_PROFILE" collector-frontend:latest
 ```
 
+Note: if you already publish images to GHCR via CI/CD, you can skip the local build step and deploy directly from GHCR (see section **5b** below).
+
 ## 3) Configure secrets (placeholders)
 
 Manifests ship with placeholder values (`*.example.yaml`). **Do not commit real secrets**.
@@ -172,6 +174,46 @@ kubectl apply -k infra/k8s/overlays/minikube
 kubectl apply -k infra/k8s/overlays/minikube-with-zitadel
 kubectl -n collector get pods
 ```
+
+### 5b) Deploy / update using images from GHCR (optional)
+
+If you push `collector-api` and `collector-front` and their pipelines publish images to GHCR, you can deploy without building images locally.
+
+Demo mode (`latest`, simplest):
+
+```bash
+kubectl apply -k infra/k8s/overlays/minikube-ghcr
+# or (includes ZITADEL):
+kubectl apply -k infra/k8s/overlays/minikube-with-zitadel-ghcr
+
+kubectl -n collector rollout restart deployment/collector-api deployment/collector-front
+```
+
+These overlays set `imagePullPolicy: Always` for the app images so `:latest` is refreshed when pods restart.
+
+Strict mode (pin immutable image tags to SHAs):
+
+```bash
+API_SHA=<collector-api commit SHA>
+FRONT_SHA=<collector-front commit SHA>
+
+kubectl kustomize infra/k8s/overlays/minikube-ghcr-sha \
+  | sed "s/__API_SHA__/${API_SHA}/g; s/__FRONT_SHA__/${FRONT_SHA}/g" \
+  | kubectl apply -f -
+```
+
+If your GHCR images are private, configure an `imagePullSecret` once:
+
+```bash
+kubectl -n collector create secret docker-registry ghcr-creds \
+  --docker-server=ghcr.io \
+  --docker-username=<github-username> \
+  --docker-password=<PAT with read:packages> \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n collector patch serviceaccount default -p '{"imagePullSecrets":[{"name":"ghcr-creds"}]}'
+```
+
+Note: default image names are defined in `infra/k8s/overlays/*-ghcr/kustomization.yaml`. If you fork/rename repos, update `newName` accordingly (GHCR image names must be lowercase).
 
 Or via the Makefile (recommended):
 

@@ -53,6 +53,15 @@ make minikube-deploy-app
 make minikube-deploy-app-zitadel
 ```
 
+If you want Minikube to pull the latest images published to GHCR (instead of building locally), use the GHCR overlays:
+
+```bash
+cd infraBloc3
+kubectl apply -k infra/k8s/overlays/minikube-ghcr
+# or (includes ZITADEL inside Minikube):
+kubectl apply -k infra/k8s/overlays/minikube-with-zitadel-ghcr
+```
+
 Load testing (k6, runs inside the cluster and remote-writes to Prometheus):
 
 ```bash
