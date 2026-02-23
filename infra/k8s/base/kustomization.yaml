@@ -14,6 +14,7 @@ resources:
   - api/secret.example.yaml
   - api/service.yaml
   - api/deployment.yaml
+  - api/hpa.yaml
   - api/migrate-job.yaml
 
   - frontend/configmap.yaml
