@@ -1,0 +1,141 @@
+name: Deploy POC (Minikube)
+
+on:
+  workflow_dispatch:
+    inputs:
+      overlay:
+        description: "Kustomize overlay path (relative to infra/k8s)"
+        required: false
+        default: "overlays/minikube"
+      namespace:
+        description: "Kubernetes namespace for rollout/smoke checks"
+        required: false
+        default: "collector"
+
+jobs:
+  deploy:
+    # Minikube runs on the same machine as the runner, so kubectl must have local access
+    # to the Minikube kubeconfig/context. This is why we use a self-hosted runner.
+    runs-on: [self-hosted]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify kubectl
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v kubectl
+          kubectl version --client --output=yaml
+          kubectl config current-context || true
+
+      - name: Apply manifests (kustomize)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          overlay="${{ inputs.overlay }}"
+          path="infra/k8s/${overlay}"
+
+          if [[ ! -f "${path}/kustomization.yaml" && ! -f "${path}/kustomization.yml" ]]; then
+            echo "::error::kustomization.yaml not found in ${path}"
+            echo "Set the 'overlay' input relative to infra/k8s (e.g. overlays/minikube-with-zitadel)."
+            exit 1
+          fi
+
+          kubectl apply -k "${path}"
+
+      - name: Wait for rollouts (api/front/zitadel)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          namespace="${{ inputs.namespace }}"
+          desired=(collector-front collector-api zitadel)
+
+          waited=0
+          for name in "${desired[@]}"; do
+            if kubectl -n "${namespace}" get deployment "${name}" >/dev/null 2>&1; then
+              echo "Waiting for deployment/${name} in namespace ${namespace}"
+              kubectl -n "${namespace}" rollout status "deployment/${name}" --timeout=180s
+              waited=1
+            fi
+          done
+
+          if [[ "${waited}" -eq 0 ]]; then
+            echo "Known deployments not found; waiting for all deployments in namespace ${namespace}"
+            deps=()
+            while IFS= read -r name; do
+              [[ -n "${name}" ]] && deps+=("${name}")
+            done < <(kubectl -n "${namespace}" get deployments -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+            if [[ "${#deps[@]}" -eq 0 ]]; then
+              echo "::error::No deployments found in namespace ${namespace}"
+              kubectl -n "${namespace}" get all || true
+              exit 1
+            fi
+            for name in "${deps[@]}"; do
+              kubectl -n "${namespace}" rollout status "deployment/${name}" --timeout=180s
+            done
+          fi
+
+      - name: Smoke test (pods Ready)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          namespace="${{ inputs.namespace }}"
+
+          kubectl -n "${namespace}" get pods -o wide
+
+          pods=()
+          while IFS= read -r pod; do
+            [[ -n "${pod}" ]] && pods+=("${pod}")
+          done < <(kubectl -n "${namespace}" get pods \
+            --field-selector=status.phase!=Succeeded,status.phase!=Failed \
+            -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+
+          if [[ "${#pods[@]}" -eq 0 ]]; then
+            echo "::error::No running pods found in namespace ${namespace}"
+            exit 1
+          fi
+
+          for pod in "${pods[@]}"; do
+            kubectl -n "${namespace}" wait --for=condition=Ready "pod/${pod}" --timeout=180s
+          done
+
+      - name: Optional HTTP check (/ready)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          namespace="${{ inputs.namespace }}"
+
+          if ! command -v curl >/dev/null 2>&1; then
+            echo "curl not available; skipping HTTP smoke test"
+            exit 0
+          fi
+
+          if ! kubectl -n "${namespace}" get svc collector-api >/dev/null 2>&1; then
+            echo "service/collector-api not found; skipping HTTP smoke test"
+            exit 0
+          fi
+
+          kubectl -n "${namespace}" port-forward svc/collector-api 18080:3000 >/tmp/pf-api.log 2>&1 &
+          pf_api=$!
+
+          cleanup() {
+            kill "${pf_api}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for i in {1..30}; do
+            if curl -fsS "http://127.0.0.1:18080/ready" >/dev/null; then
+              echo "API /ready OK"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::warning::API /ready did not respond in time"
+          tail -n 200 /tmp/pf-api.log || true
+          exit 0

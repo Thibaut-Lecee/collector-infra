@@ -1,184 +1,184 @@
 name: k6 Load Tests (CI)
 
 on:
-    workflow_dispatch:
-        inputs:
-            scenario:
-                description: "Test scenario to run"
-                required: true
-                default: "smoke"
-                type: choice
-                options:
-                    - smoke
-                    - load
-                    - stress
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: "Test scenario to run"
+        required: true
+        default: "smoke"
+        type: choice
+        options:
+          - smoke
+          - load
+          - stress
 
 jobs:
-    k6:
-        name: k6 ${{ github.event.inputs.scenario }} test
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            packages: read
+  k6:
+    name: k6 ${{ github.event.inputs.scenario }} test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            - name: Setup kubectl
-              uses: azure/setup-kubectl@v4
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
 
-            - name: Create kind cluster
-              uses: helm/kind-action@v1
-              with:
-                  cluster_name: collector-k6
-                  wait: 120s
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: collector-k6
+          wait: 120s
 
-            # ── Pull secret GHCR ────────────────────────────────────────────
-            - name: Configure GHCR pull secret
-              env:
-                  GHCR_USERNAME: ${{ github.actor }}
-                  GHCR_PASSWORD: ${{ secrets.GHCR_PULL_TOKEN != '' && secrets.GHCR_PULL_TOKEN || github.token }}
-              run: |
-                  set -euo pipefail
+      # ── Pull secret GHCR ────────────────────────────────────────────
+      - name: Configure GHCR pull secret
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_PASSWORD: ${{ secrets.GHCR_PULL_TOKEN != '' && secrets.GHCR_PULL_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
 
-                  kubectl create namespace collector --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create namespace collector --dry-run=client -o yaml | kubectl apply -f -
 
-                  kubectl -n collector create secret docker-registry ghcr-creds \
-                    --docker-server=ghcr.io \
-                    --docker-username="$GHCR_USERNAME" \
-                    --docker-password="$GHCR_PASSWORD" \
-                    --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n collector create secret docker-registry ghcr-creds \
+            --docker-server=ghcr.io \
+            --docker-username="$GHCR_USERNAME" \
+            --docker-password="$GHCR_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
 
-                  for i in {1..20}; do
-                    if kubectl -n collector get serviceaccount default >/dev/null 2>&1; then break; fi
-                    sleep 1
-                  done
+          for i in {1..20}; do
+            if kubectl -n collector get serviceaccount default >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
 
-                  kubectl -n collector patch serviceaccount default \
-                    -p '{"imagePullSecrets":[{"name":"ghcr-creds"}]}'
+          kubectl -n collector patch serviceaccount default \
+            -p '{"imagePullSecrets":[{"name":"ghcr-creds"}]}'
 
-            # ── Deploy application ───────────────────────────────────────────
-            - name: Deploy application (ci-smoke-ghcr overlay)
-              run: kubectl apply -k infra/k8s/overlays/ci-smoke-ghcr
+      # ── Deploy application ───────────────────────────────────────────
+      - name: Deploy application (ci-smoke-ghcr overlay)
+        run: kubectl apply -k infra/k8s/overlays/ci-smoke-ghcr
 
-            - name: Wait for Postgres
-              run: kubectl -n collector rollout status statefulset/postgres --timeout=180s
+      - name: Wait for Postgres
+        run: kubectl -n collector rollout status statefulset/postgres --timeout=180s
 
-            - name: Wait for migrations
-              run: |
-                  set -euo pipefail
-                  timeout_seconds=300
-                  end=$((SECONDS + timeout_seconds))
+      - name: Wait for migrations
+        run: |
+          set -euo pipefail
+          timeout_seconds=300
+          end=$((SECONDS + timeout_seconds))
 
-                  while (( SECONDS < end )); do
-                    if kubectl -n collector get job collector-api-migrate \
-                        -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null \
-                        | grep -q "True"; then
-                      echo "Migrations completed"
-                      exit 0
-                    fi
-                    if kubectl -n collector get job collector-api-migrate \
-                        -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null \
-                        | grep -q "True"; then
-                      echo "::error::Migrations failed"
-                      kubectl -n collector logs -l app=collector-api-migrate --tail=200 || true
-                      exit 1
-                    fi
-                    sleep 5
-                  done
+          while (( SECONDS < end )); do
+            if kubectl -n collector get job collector-api-migrate \
+                -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null \
+                | grep -q "True"; then
+              echo "Migrations completed"
+              exit 0
+            fi
+            if kubectl -n collector get job collector-api-migrate \
+                -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null \
+                | grep -q "True"; then
+              echo "::error::Migrations failed"
+              kubectl -n collector logs -l app=collector-api-migrate --tail=200 || true
+              exit 1
+            fi
+            sleep 5
+          done
 
-                  echo "::error::Timed out waiting for migrations"
-                  exit 1
+          echo "::error::Timed out waiting for migrations"
+          exit 1
 
-            - name: Wait for API ready
-              run: |
-                  set -euo pipefail
-                  kubectl -n collector rollout status deployment/collector-api --timeout=180s
+      - name: Wait for API ready
+        run: |
+          set -euo pipefail
+          kubectl -n collector rollout status deployment/collector-api --timeout=180s
 
-                  kubectl -n collector port-forward svc/collector-api 3000:3000 >/tmp/pf-api.log 2>&1 &
-                  pf=$!
-                  trap "kill $pf 2>/dev/null || true" EXIT
+          kubectl -n collector port-forward svc/collector-api 3000:3000 >/tmp/pf-api.log 2>&1 &
+          pf=$!
+          trap "kill $pf 2>/dev/null || true" EXIT
 
-                  for i in {1..30}; do
-                    if curl -fsS http://localhost:3000/ready >/dev/null; then
-                      echo "API is ready"
-                      break
-                    fi
-                    sleep 2
-                  done
-                  curl -fsS http://localhost:3000/ready >/dev/null
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3000/ready >/dev/null; then
+              echo "API is ready"
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS http://localhost:3000/ready >/dev/null
 
-            # ── k6 ──────────────────────────────────────────────────────────
-            - name: Upload k6 scripts as ConfigMap
-              run: |
-                  kubectl -n collector create configmap k6-scripts \
-                    --from-file=infra/k8s/observability/k6/scripts \
-                    --dry-run=client -o yaml | kubectl apply -f -
+      # ── k6 ──────────────────────────────────────────────────────────
+      - name: Upload k6 scripts as ConfigMap
+        run: |
+          kubectl -n collector create configmap k6-scripts \
+            --from-file=infra/k8s/observability/k6/scripts \
+            --dry-run=client -o yaml | kubectl apply -f -
 
-            - name: Run k6 ${{ github.event.inputs.scenario }} test
-              run: |
-                  set -euo pipefail
-                  SCENARIO="${{ github.event.inputs.scenario }}"
-                  JOB_NAME="k6-${SCENARIO}"
-                  MANIFEST="infra/k8s/observability/k6/job-${SCENARIO}.yaml"
+      - name: Run k6 ${{ github.event.inputs.scenario }} test
+        run: |
+          set -euo pipefail
+          SCENARIO="${{ github.event.inputs.scenario }}"
+          JOB_NAME="k6-${SCENARIO}"
+          MANIFEST="infra/k8s/observability/k6/job-${SCENARIO}.yaml"
 
-                  # Delete previous job if exists (idempotent)
-                  kubectl -n collector delete job "${JOB_NAME}" --ignore-not-found=true
+          # Delete previous job if exists (idempotent)
+          kubectl -n collector delete job "${JOB_NAME}" --ignore-not-found=true
 
-                  kubectl apply -f "${MANIFEST}"
+          kubectl apply -f "${MANIFEST}"
 
-                  echo "Waiting for k6 pod to start..."
-                  pod=""
-                  for _ in $(seq 1 60); do
-                    pod="$(kubectl -n collector get pods -l "job-name=${JOB_NAME}" \
-                      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-                    [[ -n "${pod}" ]] && break
-                    sleep 1
-                  done
+          echo "Waiting for k6 pod to start..."
+          pod=""
+          for _ in $(seq 1 60); do
+            pod="$(kubectl -n collector get pods -l "job-name=${JOB_NAME}" \
+              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+            [[ -n "${pod}" ]] && break
+            sleep 1
+          done
 
-                  if [[ -z "${pod}" ]]; then
-                    echo "::error::No pod found for job ${JOB_NAME}"
-                    kubectl -n collector get pods
-                    exit 1
-                  fi
+          if [[ -z "${pod}" ]]; then
+            echo "::error::No pod found for job ${JOB_NAME}"
+            kubectl -n collector get pods
+            exit 1
+          fi
 
-                  echo "Streaming logs from pod ${pod}..."
-                  kubectl -n collector wait \
-                    --for=jsonpath='{.status.phase}'=Running "pod/${pod}" \
-                    --timeout=120s >/dev/null 2>&1 || true
+          echo "Streaming logs from pod ${pod}..."
+          kubectl -n collector wait \
+            --for=jsonpath='{.status.phase}'=Running "pod/${pod}" \
+            --timeout=120s >/dev/null 2>&1 || true
 
-                  kubectl -n collector logs -f "${pod}" --pod-running-timeout=2m &
-                  log_pid=$!
+          kubectl -n collector logs -f "${pod}" --pod-running-timeout=2m &
+          log_pid=$!
 
-                  # Wait for job completion (10 min max)
-                  result=""
-                  for _ in $(seq 1 600); do
-                    succeeded="$(kubectl -n collector get job "${JOB_NAME}" \
-                      -o jsonpath='{.status.succeeded}' 2>/dev/null || true)"
-                    failed="$(kubectl -n collector get job "${JOB_NAME}" \
-                      -o jsonpath='{.status.failed}' 2>/dev/null || true)"
+          # Wait for job completion (10 min max)
+          result=""
+          for _ in $(seq 1 600); do
+            succeeded="$(kubectl -n collector get job "${JOB_NAME}" \
+              -o jsonpath='{.status.succeeded}' 2>/dev/null || true)"
+            failed="$(kubectl -n collector get job "${JOB_NAME}" \
+              -o jsonpath='{.status.failed}' 2>/dev/null || true)"
 
-                    if [[ "${succeeded}" == "1" ]]; then result="succeeded"; break; fi
-                    if [[ -n "${failed}" && "${failed}" != "0" ]]; then result="failed"; break; fi
-                    sleep 1
-                  done
+            if [[ "${succeeded}" == "1" ]]; then result="succeeded"; break; fi
+            if [[ -n "${failed}" && "${failed}" != "0" ]]; then result="failed"; break; fi
+            sleep 1
+          done
 
-                  kill "${log_pid}" 2>/dev/null || true
+          kill "${log_pid}" 2>/dev/null || true
 
-                  if [[ "${result}" == "succeeded" ]]; then
-                    echo "k6 ${SCENARIO} job completed successfully"
-                    exit 0
-                  else
-                    echo "::error::k6 ${SCENARIO} job failed or timed out (result=${result:-timeout})"
-                    exit 1
-                  fi
+          if [[ "${result}" == "succeeded" ]]; then
+            echo "k6 ${SCENARIO} job completed successfully"
+            exit 0
+          else
+            echo "::error::k6 ${SCENARIO} job failed or timed out (result=${result:-timeout})"
+            exit 1
+          fi
 
-            # ── Diagnostics on failure ───────────────────────────────────────
-            - name: Dump logs on failure
-              if: failure()
-              run: |
-                  kubectl -n collector get pods -o wide || true
-                  kubectl -n collector logs deployment/collector-api -c api --tail=200 || true
-                  kubectl -n collector logs -l "app=k6" --tail=200 || true
-                  kubectl -n collector describe pods -l "app=k6" || true
+      # ── Diagnostics on failure ───────────────────────────────────────
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          kubectl -n collector get pods -o wide || true
+          kubectl -n collector logs deployment/collector-api -c api --tail=200 || true
+          kubectl -n collector logs -l "app=k6" --tail=200 || true
+          kubectl -n collector describe pods -l "app=k6" || true
