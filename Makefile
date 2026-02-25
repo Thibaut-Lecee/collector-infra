@@ -60,7 +60,7 @@ minikube-k6-stress: minikube-k6-scripts
 	@bash $(K8S_SCRIPTS_DIR)/run-k6-job.sh k6-stress $(K8S_K6_DIR)/job-stress.yaml
 
 minikube-start:
-	@$(MINIKUBE) start --driver=docker --cpus=4 --memory=4096
+	@$(MINIKUBE) start --driver=docker --cpus=4 --memory=4096 
 	@$(MINIKUBE) addons enable ingress >/dev/null
 	@$(MINIKUBE) update-context >/dev/null
 	@kubectl config use-context $(MINIKUBE_PROFILE) >/dev/null

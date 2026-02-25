@@ -34,6 +34,8 @@ spec:
               value: https://collector.local/internal/grafana/
             - name: GF_SERVER_SERVE_FROM_SUB_PATH
               value: "true"
+            - name: GF_LIVE_ALLOWED_ORIGINS
+              value: "https://collector.local"
           volumeMounts:
             - name: grafana-ini
               mountPath: /etc/grafana/grafana.ini
