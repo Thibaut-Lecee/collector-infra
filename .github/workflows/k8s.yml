@@ -228,33 +228,25 @@ jobs:
         run: |
           set -euo pipefail
 
-          kubectl -n collector port-forward svc/collector-api 3000:3000 >/tmp/pf-api.log 2>&1 &
-          pf_api=$!
-          kubectl -n collector port-forward svc/collector-front 3001:3000 >/tmp/pf-front.log 2>&1 &
-          pf_front=$!
-
-          cleanup() {
-            kill "$pf_api" "$pf_front" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-
+          echo "Testing API endpoint..."
           for i in {1..30}; do
-            if curl -fsS http://localhost:3000/ready >/dev/null; then
+            if kubectl -n collector run smoke-test-api --image=curlimages/curl:latest --restart=Never --rm -i -- curl -fsS http://collector-api:3000/ready >/dev/null; then
               echo "API is ready"
               break
             fi
             sleep 2
           done
-          curl -fsS http://localhost:3000/ready >/dev/null
+          kubectl -n collector run smoke-test-api --image=curlimages/curl:latest --restart=Never --rm -i -- curl -fsS http://collector-api:3000/ready >/dev/null
 
+          echo "Testing Frontend endpoint..."
           for i in {1..30}; do
-            if curl -fsS http://localhost:3001/health >/dev/null; then
+            if kubectl -n collector run smoke-test-front --image=curlimages/curl:latest --restart=Never --rm -i -- curl -fsS http://collector-front:3000/health >/dev/null; then
               echo "Frontend is healthy"
               break
             fi
             sleep 2
           done
-          curl -fsS http://localhost:3001/health >/dev/null
+          kubectl -n collector run smoke-test-front --image=curlimages/curl:latest --restart=Never --rm -i -- curl -fsS http://collector-front:3000/health >/dev/null
 
       - name: Dump logs on failure
         if: failure()
